@@ -33,6 +33,12 @@ class UnitySetupInstance {
     [UnityVersion]$Version
     [UnitySetupComponent]$Components
     [string]$Path
+
+    UnitySetupInstance([UnityVersion]$version, [UnitySetupComponent]$components)
+    {
+        $this.Version = $version
+        $this.Components = $components
+    }
     
     UnitySetupInstance([string]$path) {
         
@@ -180,11 +186,11 @@ function ConvertTo-UnitySetupComponent {
 .PARAMETER Components
    What components would you like to search for? Defaults to All
 .EXAMPLE
-   Find-UnitySetupInstaller -Version 2017.3.0f3
+   Find-UnitySetupInstance -Version 2017.3.0f3
 .EXAMPLE
-   Find-UnitySetupInstaller -Version 2017.3.0f3 -Components Setup,Documentation 
+   Find-UnitySetupInstance -Version 2017.3.0f3 -Components Setup,Documentation 
 #>
-function Find-UnitySetupInstaller {
+function Find-UnitySetupInstance {
     [CmdletBinding()]
     param(
         [parameter(Mandatory = $true)]
@@ -266,37 +272,33 @@ function Find-UnitySetupInstaller {
         $knownBaseUrls = $knownBaseUrls | Sort-Object -Property @{ Expression = {[math]::Abs(($_.CompareTo($linkComponents[0])))}; Ascending = $true}
     }
     
-    $installerTemplates.Keys |  Where-Object { $Components -band $_ } | ForEach-Object {
+    $foundComponents = $installerTemplates.Keys |  Where-Object { $Components -band $_ } | ForEach-Object {
         $templates = $installerTemplates.Item($_);
-        $result = $null
-        foreach ($template in $templates ) {
-            foreach ( $baseUrl in $knownBaseUrls) {
+        $found = $false
+        for ($i = 0; -not $found -and $i -lt $templates.Length; ++$i ) {
+            $template = $templates[$i]
+            
+            for( $j = 0; -not $found -and $j -lt $knownBaseUrls.Length; ++$j ) {
+                $baseUrl = $knownBaseUrls[$j]
                 $endpoint = [uri][System.IO.Path]::Combine($baseUrl, $linkComponents[1], $template);
                 try {
-                    $testResult = Invoke-WebRequest $endpoint -Method HEAD -UseBasicParsing
-                    $result = New-Object UnitySetupInstaller -Property @{
-                        'ComponentType' = $_;
-                        'Version' = $Version;
-                        'DownloadUrl' = $endpoint;
-                        'Length' = [int64]$testResult.Headers['Content-Length'];
-                        'LastModified' = ([System.DateTime]$testResult.Headers['Last-Modified']);
-                    }
-
-                    break
+                    Invoke-WebRequest $endpoint -Method HEAD -UseBasicParsing | Out-Null
+                    $found = $true
                 }
                 catch {
                     Write-Verbose "$endpoint failed: $_"
                 }
             }
-
-            if ( $result ) { break }
         }
 
-        if ( -not $result ) {
-            Write-Warning "Unable to find installer for the $_ component."
-        }
-        else { $result }
-    } | Sort-Object -Property ComponentType
+        if ( $found ) { $_ }
+        else { Write-Warning "Unable to find installer for the $_ component." }
+    }
+
+    if( $foundComponents.Length -gt 0 )
+    {
+        [UnitySetupInstance]::new($Version, $foundComponents)
+    }
 }
 
 <#
