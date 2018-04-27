@@ -76,6 +76,7 @@
 
     FunctionsToExport = @(
         'Find-UnitySetupInstaller',
+        'Find-UnitySetupInstance',
         'Get-UnityProjectInstance',
         'Get-UnitySetupInstance',
         'Install-UnitySetupInstance',

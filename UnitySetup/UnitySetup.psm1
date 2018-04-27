@@ -71,7 +71,7 @@ class UnitySetupInstance {
                     [UnitySetupComponent]::StandardAssets = , [io.path]::Combine("$Path", "Editor\Standard Assets");
                     [UnitySetupComponent]::Windows_IL2CPP = , [io.path]::Combine("$playbackEnginePath", "windowsstandalonesupport\Variations\win32_development_il2cpp");
                     [UnitySetupComponent]::Metro = [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_.NET_D3D"),
-                        [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_D3D");
+                    [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_D3D");
                     [UnitySetupComponent]::UWP_IL2CPP = , [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_IL2CPP_D3D");
                     [UnitySetupComponent]::Linux = , [io.path]::Combine("$playbackEnginePath", "LinuxStandaloneSupport");
                     [UnitySetupComponent]::Mac = , [io.path]::Combine("$playbackEnginePath", "MacStandaloneSupport");
@@ -247,6 +247,87 @@ function ConvertTo-UnitySetupComponent {
     $Component
 }
 
+function Find-UnitySetupInstance {
+    [CmdletBinding( DefaultParameterSetName = "NoVersion")]
+    param(
+        [parameter(Mandatory = $true, ParameterSetName = 'MinVersion')]
+        [parameter(Mandatory = $true, ParameterSetName = 'MinMaxVersion')]
+        [UnityVersion]$MinimumVersion,
+
+        [parameter(Mandatory = $true, ParameterSetName = 'MaxVersion')]
+        [parameter(Mandatory = $true, ParameterSetName = 'MinMaxVersion')]
+        [UnityVersion]$MaximumVersion,
+
+        [parameter(Mandatory = $true, ParameterSetName = 'RequiredVersion')]
+        [UnityVersion]$RequiredVersion,
+
+        [parameter(Mandatory = $true, ParameterSetName = 'Latest')]
+        [switch]$Latest
+    )
+
+    if ( $Verbose ) { $VerbosePreference = 'Continue' }
+
+    # $knownBaseUrls = @(
+    #     "https://download.unity3d.com/download_unity",
+    #     "https://netstorage.unity3d.com/unity",
+    #     "https://beta.unity3d.com/download"
+    # )
+
+    # By default Tls12 protocol is not enabled, but is what backs Unity's website, so enable it
+    $secProtocol = [System.Net.ServicePointManager]::SecurityProtocol
+    if ( ($secProtocol -band [System.Net.SecurityProtocolType]::Tls12) -eq 0 ) {
+        $secProtocol += [System.Net.SecurityProtocolType]::Tls12;
+        [System.Net.ServicePointManager]::SecurityProtocol = $secProtocol
+    }
+
+    $patchPage = "https://unity3d.com/unity/qa/patch-releases?page=1"
+    $searchPages = @("https://unity3d.com/get-unity/download/archive", "https://unity3d.com/unity/beta-download", $patchPage)
+    $patchPageResult = Invoke-WebRequest $patchPage -UseBasicParsing
+    $searchPages += $patchPageResult.Links.href | ForEach-Object {
+        if ( ($_ -match "\/unity\/qa\/patch-releases\?page=(\d+)$") -and ($Matches[1] -gt 1) ) {
+            "https://unity3d.com$_"
+        }
+    }
+
+    Write-Verbose "Beginning search across: $searchPages"
+
+    $unityComponentRegex = "([a-z0-9])\/\w+\/([\w-]+)-(\d+)\.(\d+)\.(\d+)([fpb])(\d+)\.(\S+)$"
+    $extToPlat = @{
+        'exe' = [OperatingSystem]::Windows
+        'zip' = [OperatingSystem]::Windows
+        'pkg' = [OperatingSystem]::Mac
+        'dmg' = [OperatingSystem]::Mac
+    }
+
+    foreach ($page in $searchPages) {
+        $webResult = Invoke-WebRequest $page -UseBasicParsing
+        $components += $webResult.Links.href | ForEach-Object {
+            if ( $_ -match $unityComponentRegex ) {
+                Write-Verbose "Found component match: $_"
+                $version = [UnityVersion]"$($Matches[3]).$($Matches[4]).$($Matches[5])$($Matches[6])$($Matches[7])"
+                if ( $RequiredVersion -and $Version -ne $RequiredVersion) { return }
+                if ( $MinimumVersion -and $Version -lt $MinimumVersion) { return }
+                if ( $MaximumVersion -and $Version -gt $MaximumVersion) { return }
+                @{
+                    'Name' = $Matches[2]
+                    'Hash' = $Matches[1]
+                    'Version' = $version
+                    'OS' = $extToPlat[$Matches[8]]
+                    'Uri' = [uri]$_
+                }
+            }
+        }
+    }
+
+    if( $Latest -and $components.Count -gt 1) { 
+        $components = $components | Sort-Object -Property Version -Descending
+        $components = $components | Where-Object { $_.Version -gt $components[0] }
+    }
+
+    Write-Verbose "Found $($components.Count) components!"
+    $components
+}
+
 <#
 .Synopsis
    Finds UnitySetup installers for a specified version.
@@ -279,6 +360,7 @@ function Find-UnitySetupInstaller {
     )
 
     $installerTemplates = @{
+        [UnitySetupComponent]::Windows = , "Windows64EditorInstaller/UnitySetup64-$Version.exe";
         [UnitySetupComponent]::Documentation = , "WindowsDocumentationInstaller/UnityDocumentationSetup-$Version.exe";
         [UnitySetupComponent]::StandardAssets = , "WindowsStandardAssetsInstaller/UnityStandardAssetsSetup-$Version.exe";
         [UnitySetupComponent]::Metro = , "TargetSupportInstaller/UnitySetup-Metro-Support-for-Editor-$Version.exe";
@@ -289,7 +371,7 @@ function Find-UnitySetupInstaller {
         [UnitySetupComponent]::Facebook = , "TargetSupportInstaller/UnitySetup-Facebook-Games-Support-for-Editor-$Version.exe";
         [UnitySetupComponent]::Linux = , "TargetSupportInstaller/UnitySetup-Linux-Support-for-Editor-$Version.exe";
         [UnitySetupComponent]::Mac = "TargetSupportInstaller/UnitySetup-Mac-Support-for-Editor-$Version.exe",
-            "TargetSupportInstaller/UnitySetup-Mac-Mono-Support-for-Editor-$Version.exe";
+        "TargetSupportInstaller/UnitySetup-Mac-Mono-Support-for-Editor-$Version.exe";
         [UnitySetupComponent]::Vuforia = , "TargetSupportInstaller/UnitySetup-Vuforia-AR-Support-for-Editor-$Version.exe";
         [UnitySetupComponent]::WebGL = , "TargetSupportInstaller/UnitySetup-WebGL-Support-for-Editor-$Version.exe";
         [UnitySetupComponent]::Windows_IL2CPP = , "TargetSupportInstaller/UnitySetup-Windows-IL2CPP-Support-for-Editor-$Version.exe";
@@ -299,7 +381,6 @@ function Find-UnitySetupInstaller {
     switch ($currentOS) {
         ([OperatingSystem]::Windows) {
             $setupComponent = [UnitySetupComponent]::Windows
-            $installerTemplates[$setupComponent] = , "Windows64EditorInstaller/UnitySetup64-$Version.exe";
         }
         ([OperatingSystem]::Linux) {
             $setupComponent = [UnitySetupComponent]::Linux
@@ -331,8 +412,8 @@ function Find-UnitySetupInstaller {
             $patchPage = "https://unity3d.com/unity/qa/patch-releases?version=$($Version.Major).$($Version.Minor)"
             $searchPages += $patchPage
 
-            $webResult = Invoke-WebRequest $patchPage -UseBasicParsing 
-            $searchPages += $webResult.Links | Where-Object { 
+            $webResult = Invoke-WebRequest $patchPage -UseBasicParsing
+            $searchPages += $webResult.Links | Where-Object {
                 $_.href -match "\/unity\/qa\/patch-releases\?version=$($Version.Major)\.$($Version.Minor)&page=(\d+)" -and $Matches[1] -gt 1
             } | ForEach-Object { "https://unity3d.com$($_.href)" }
         }
@@ -471,7 +552,7 @@ function Install-UnitySetupInstance {
 
             Start-BitsTransfer -Source $downloadSource -Destination $downloadDest
         }
-       
+
         for ($i = 0; $i -lt $localInstallers.Length; $i++) {
             $installer = $localInstallers[$i]
             $destination = $localDestinations[$i]
@@ -485,16 +566,16 @@ function Install-UnitySetupInstance {
             if ($Verb) {
                 $startProcessArgs['Verb'] = $Verb
             }
-            
+
             Write-Verbose "$(Get-Date): Installing $installer to $destination."
             $process = Start-Process @startProcessArgs
-            if( $process ) {
+            if ( $process ) {
                 $process.WaitForExit()
 
                 if ( $process.ExitCode -ne 0) {
                     Write-Error "$(Get-Date): Failed with exit code: $($process.ExitCode)"
                 }
-                else { 
+                else {
                     Write-Verbose "$(Get-Date): Succeeded."
                 }
             }
@@ -881,7 +962,7 @@ function Start-UnityEditor {
                 ([OperatingSystem]::Windows) {
                     $editor = Get-ChildItem "$($setupInstance.Path)" -Filter 'Unity.exe' -Recurse |
                         Select-Object -First 1 -ExpandProperty FullName
-    
+
                     if ([string]::IsNullOrEmpty($editor)) {
                         Write-Error "Could not find Unity.exe under setup instance path: $($setupInstance.Path)"
                         continue
@@ -892,7 +973,7 @@ function Start-UnityEditor {
                 }
                 ([OperatingSystem]::Mac) {
                     $editor = [io.path]::Combine("$($setupInstance.Path)", "Unity.app/Contents/MacOS/Unity")
-    
+
                     if ([string]::IsNullOrEmpty($editor)) {
                         Write-Error "Could not find Unity app under setup instance path: $($setupInstance.Path)"
                         continue
@@ -949,11 +1030,11 @@ function Start-UnityEditor {
 
     $alias = Get-Alias -Name $_.Name -ErrorAction 'SilentlyContinue'
     if ( -not $alias ) {
-        Write-Verbose "Creating new alias $($_.Name) for $($_.Value)" 
-        New-Alias @_ 
+        Write-Verbose "Creating new alias $($_.Name) for $($_.Value)"
+        New-Alias @_
     }
     elseif ( $alias.ModuleName -eq 'UnitySetup' ) {
-        Write-Verbose "Setting alias $($_.Name) to $($_.Value)" 
+        Write-Verbose "Setting alias $($_.Name) to $($_.Value)"
         Set-Alias @_
     }
     else {
