@@ -1285,8 +1285,8 @@ function Start-UnityEditor {
         [parameter(Mandatory = $true, ParameterSetName = 'Latest')]
         [parameter(Mandatory = $true, ParameterSetName = 'ProjectsLatest')]
         [switch]$Latest,
-        [parameter(Mandatory = $true, ParameterSetName = 'Version')]
-        [parameter(Mandatory = $true, ParameterSetName = 'ProjectsVersion')]
+        # [parameter(Mandatory = $true, ParameterSetName = 'Version')]
+        # [parameter(Mandatory = $true, ParameterSetName = 'ProjectsVersion')]
         [UnityVersion]$Version,
         [parameter(Mandatory = $false, ParameterSetName = 'Latest')]
         [parameter(Mandatory = $false, ParameterSetName = 'Version')]
@@ -1343,6 +1343,19 @@ function Start-UnityEditor {
         [parameter(Mandatory = $false)]
         [switch]$PassThru
     )
+    DynamicParam {
+        # Create our set of dynamic params
+        $result = [System.Management.Automation.RuntimeDefinedParameterDictionary]::new()
+
+        # Version Parameter
+        [string[]]$unityVersions = Get-UnitySetupInstance | Select-Object -ExpandProperty 'Version'
+        $versionAttributes = [Collections.ObjectModel.Collection[System.Attribute]]::new()
+        $versionAttributes.Add([System.Management.Automation.ValidateSetAttribute]::new($unityVersions))
+        $versionParameter = [System.Management.Automation.RuntimeDefinedParameter]::new('Version', ([UnityVersion]), $versionAttributes)
+        $result.Add('Version', $versionParameter)
+        
+        Write-Output $result
+    }
     process {
         switch -wildcard ( $PSCmdlet.ParameterSetName ) {
             'Context' {
