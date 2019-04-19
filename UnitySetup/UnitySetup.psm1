@@ -234,15 +234,15 @@ class UnityVersion : System.IComparable {
    }
 #>
 function Get-OperatingSystem {
-    if ((-not $global:PSVersionTable.Platform) -or ($global:PSVersionTable.Platform -eq "Win32NT")) {
-        return [OperatingSystem]::Windows
-    }
-    elseif ($global:PSVersionTable.OS.Contains("Linux")) {
-        return [OperatingSystem]::Linux
-    }
-    elseif ($global:PSVersionTable.OS.Contains("Darwin")) {
+    # if ((-not $global:PSVersionTable.Platform) -or ($global:PSVersionTable.Platform -eq "Win32NT")) {
+    #     return [OperatingSystem]::Windows
+    # }
+    # elseif ($global:PSVersionTable.OS.Contains("Linux")) {
+    #     return [OperatingSystem]::Linux
+    # }
+    # elseif ($global:PSVersionTable.OS.Contains("Darwin")) {
         return [OperatingSystem]::Mac
-    }
+    #}
 }
 
 <#
@@ -290,7 +290,7 @@ function Find-UnitySetupInstaller {
     $currentOS = Get-OperatingSystem
     switch ($currentOS) {
         ([OperatingSystem]::Windows) {
-            $unitySetupRegEx = "^(.+)\/([a-z0-9]+)\/Windows64EditorInstaller\/UnitySetup64-(\d+)\.(\d+)\.(\d+)([fpb])(\d+).exe$"
+            $unitySetupRegEx = "^(.+)\/([a-z0-9]+)\/Windows64EditorInstaller\/UnitySetup64-?(\d+\.\d+\.\d+[fpb]\d+)?.exe$"
             $targetSupport = "TargetSupportInstaller"
             $installerExtension = "exe"
         }
@@ -298,7 +298,7 @@ function Find-UnitySetupInstaller {
             throw "Find-UnitySetupInstaller has not been implemented on the Linux platform. Contributions welcomed!";
         }
         ([OperatingSystem]::Mac) {
-            $unitySetupRegEx = "^(.+)\/([a-z0-9]+)\/MacEditorInstaller\/Unity-(\d+)\.(\d+)\.(\d+)([fpb])(\d+).pkg$"
+            $unitySetupRegEx = "^(.+)\/([a-z0-9]+)\/MacEditorInstaller\/Unity-?(\d+\.\d+\.\d+[fpb]\d+)?.pkg$"
             $targetSupport = "MacEditorTargetInstaller"
             $installerExtension = "pkg"
         }
@@ -330,7 +330,7 @@ function Find-UnitySetupInstaller {
     switch ($currentOS) {
         ([OperatingSystem]::Windows) {
             $setupComponent = [UnitySetupComponent]::Windows
-            $installerTemplates[$setupComponent] = , "Windows64EditorInstaller/UnitySetup64-$Version.exe";
+            $installerTemplates[$setupComponent] = , "Windows64EditorInstaller/UnitySetup64-$Version.exe", "Windows64EditorInstaller/UnitySetup64.exe";
 
             $installerTemplates[[UnitySetupComponent]::Documentation] = , "WindowsDocumentationInstaller/UnityDocumentationSetup-$Version.exe";
             $installerTemplates[[UnitySetupComponent]::StandardAssets] = , "WindowsStandardAssetsInstaller/UnityStandardAssetsSetup-$Version.exe";
@@ -343,7 +343,7 @@ function Find-UnitySetupInstaller {
         }
         ([OperatingSystem]::Mac) {
             $setupComponent = [UnitySetupComponent]::Mac
-            $installerTemplates[$setupComponent] = , "MacEditorInstaller/Unity-$Version.pkg";
+            $installerTemplates[$setupComponent] = , "MacEditorInstaller/Unity-$Version.pkg", "MacEditorInstaller/Unity.pkg";
 
             # Note: These links appear to be unavailable even on Unity's website for 2018.
             # StandardAssets appears to work if you select a 2017 version.
@@ -359,11 +359,20 @@ function Find-UnitySetupInstaller {
         [System.Net.ServicePointManager]::SecurityProtocol = $secProtocol
     }
 
+  
+
     # Every release type has a different pattern for finding installers
     $searchPages = @()
+    $betaPages = "https://unity3d.com/unity/beta/unity$Version", "https://unity3d.com/unity/beta/$Version"
+
     switch ($Version.Release) {
-        'f' { $searchPages += "https://unity3d.com/get-unity/download/archive" }
-        'b' { $searchPages += "https://unity3d.com/unity/beta/unity$Version" }
+        'f' { 
+            $searchPages += "https://unity3d.com/get-unity/download/archive"
+            $searchPages += $betaPages # 'f' build can sometimes only be on beta pages because Unity
+        }
+        'b' {
+            $searchPages += $betaPages
+        }
         'p' {
             $patchPage = "https://unity3d.com/unity/qa/patch-releases?version=$($Version.Major).$($Version.Minor)"
             $searchPages += $patchPage
@@ -376,36 +385,30 @@ function Find-UnitySetupInstaller {
     }
 
     foreach ($page in $searchPages) {
-        $webResult = Invoke-WebRequest $page -UseBasicParsing
-        $prototypeLink = $webResult.Links | Select-Object -ExpandProperty href -ErrorAction SilentlyContinue | Where-Object {
-            $_ -match "$($installerTemplates[$setupComponent])$"
-        }
-
-        if ($null -ne $prototypeLink) { break }
-    }
-
-    if ($null -eq $prototypeLink) {
-        # Attempt to find Unity version and setup links based off builtin_shaders download.
-        Write-Verbose "Attempting version search with builtin_shaders fallback"
-        foreach ($page in $searchPages) {
+        try {
             $webResult = Invoke-WebRequest $page -UseBasicParsing
             $prototypeLink = $webResult.Links | Select-Object -ExpandProperty href -ErrorAction SilentlyContinue | Where-Object {
-                $_ -match "builtin_shaders-$($Version).zip$"
+                foreach ($template in $installerTemplates[$setupComponent]) {
+                    if ($_ -match "$template$") { return $true; }
+                }
+                return $false;
             }
 
             if ($null -ne $prototypeLink) { break }
         }
-
-        if ($null -eq $prototypeLink) {
-            throw "Could not find archives for Unity version $Version"
-        }
-        else {
-            # Regex needs to be reconfigured to parse builtin_shaders's url link
-            $unitySetupRegEx = "^(.+)\/([a-z0-9]+)\/builtin_shaders-(\d+)\.(\d+)\.(\d+)([fpb])(\d+).zip$"
+        catch {
+            Write-Verbose "$page failed: $($_.Exception.Message)"
         }
     }
 
+    if ($null -eq $prototypeLink) {
+        throw "Could not find archives for Unity version $Version"
+    }
+
+    Write-Verbose "Discovered prototypeLink: $prototypeLink"
     $linkComponents = $prototypeLink -split $unitySetupRegEx -ne ""
+
+    Write-Verbose "Link components: $linkComponents"
 
     if ($knownBaseUrls -notcontains $linkComponents[0]) {
         $knownBaseUrls = $linkComponents[0], $knownBaseUrls
@@ -416,10 +419,15 @@ function Find-UnitySetupInstaller {
 
     $installerTemplates.Keys |  Where-Object { $Components -band $_ } | ForEach-Object {
         $templates = $installerTemplates.Item($_);
+        Write-Verbose "Testing template for $_"
         $result = $null
         foreach ($template in $templates ) {
+            Write-Verbose " Testing template $template"
             foreach ( $baseUrl in $knownBaseUrls) {
+                Write-Verbose "  Testing baseUrl $baseUrl"
                 $endpoint = [uri][System.IO.Path]::Combine($baseUrl, $linkComponents[1], $template);
+
+                Write-Verbose "  Final endpoint is $endpoint"
                 try {
                     $testResult = Invoke-WebRequest $endpoint -Method HEAD -UseBasicParsing
                     # For packages on macOS the Content-Length and Last-Modified are returned as an array.
