@@ -65,8 +65,8 @@ class UnitySetupInstance {
                     [UnitySetupComponent]::Documentation  = , [io.path]::Combine("$Path", "Editor\Data\Documentation");
                     [UnitySetupComponent]::StandardAssets = , [io.path]::Combine("$Path", "Editor\Standard Assets");
                     [UnitySetupComponent]::Windows_IL2CPP = , [io.path]::Combine("$playbackEnginePath", "windowsstandalonesupport\Variations\win32_development_il2cpp");
-                    [UnitySetupComponent]::UWP            =   [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_.NET_D3D"),
-                                                              [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_D3D");
+                    [UnitySetupComponent]::UWP            = [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_.NET_D3D"),
+                    [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_D3D");
                     [UnitySetupComponent]::UWP_IL2CPP     = , [io.path]::Combine("$playbackEnginePath", "MetroSupport\Templates\UWP_IL2CPP_D3D");
                     [UnitySetupComponent]::Linux          = , [io.path]::Combine("$playbackEnginePath", "LinuxStandaloneSupport");
                     [UnitySetupComponent]::Mac            = , [io.path]::Combine("$playbackEnginePath", "MacStandaloneSupport");
@@ -91,13 +91,13 @@ class UnitySetupInstance {
         }
 
         # Common playback engines:
-        $componentTests[[UnitySetupComponent]::Lumin]    = , [io.path]::Combine("$playbackEnginePath", "LuminSupport");
-        $componentTests[[UnitySetupComponent]::Android]  = , [io.path]::Combine("$playbackEnginePath", "AndroidPlayer");
-        $componentTests[[UnitySetupComponent]::iOS]      = , [io.path]::Combine("$playbackEnginePath", "iOSSupport");
-        $componentTests[[UnitySetupComponent]::AppleTV]  = , [io.path]::Combine("$playbackEnginePath", "AppleTVSupport");
+        $componentTests[[UnitySetupComponent]::Lumin] = , [io.path]::Combine("$playbackEnginePath", "LuminSupport");
+        $componentTests[[UnitySetupComponent]::Android] = , [io.path]::Combine("$playbackEnginePath", "AndroidPlayer");
+        $componentTests[[UnitySetupComponent]::iOS] = , [io.path]::Combine("$playbackEnginePath", "iOSSupport");
+        $componentTests[[UnitySetupComponent]::AppleTV] = , [io.path]::Combine("$playbackEnginePath", "AppleTVSupport");
         $componentTests[[UnitySetupComponent]::Facebook] = , [io.path]::Combine("$playbackEnginePath", "Facebook");
-        $componentTests[[UnitySetupComponent]::Vuforia]  = , [io.path]::Combine("$playbackEnginePath", "VuforiaSupport");
-        $componentTests[[UnitySetupComponent]::WebGL]    = , [io.path]::Combine("$playbackEnginePath", "WebGLSupport");
+        $componentTests[[UnitySetupComponent]::Vuforia] = , [io.path]::Combine("$playbackEnginePath", "VuforiaSupport");
+        $componentTests[[UnitySetupComponent]::WebGL] = , [io.path]::Combine("$playbackEnginePath", "WebGLSupport");
 
         $componentTests.Keys | ForEach-Object {
             foreach ( $test in $componentTests[$_] ) {
@@ -125,7 +125,7 @@ class UnityProjectInstance {
         $projectSettingsFile = [io.path]::Combine($path, "ProjectSettings\ProjectSettings.asset")
         if (!(Test-Path $projectSettingsFile)) { throw "Project is missing ProjectSettings.asset" }
 
-        try { 
+        try {
             $prodName = ((Get-Content $projectSettingsFile -Raw | ConvertFrom-Yaml)['playerSettings'])['productName']
             if (!$prodName) { throw "ProjectSettings is missing productName" }
         }
@@ -135,7 +135,7 @@ class UnityProjectInstance {
             $msg += "`nException Type: $($_.Exception.GetType().FullName)"
             $msg += "`nException Message: $($_.Exception.Message)"
             Write-Warning -Message $msg
-            
+
             $prodName = $null
         }
 
@@ -276,7 +276,7 @@ function Get-UnityEditor {
             switch ($currentOS) {
                 ([OperatingSystem]::Windows) {
                     $editor = Join-Path "$p" 'Editor\Unity.exe'
-                    
+
                     if (Test-Path $editor) {
                         Write-Output (Resolve-Path $editor).Path
                     }
@@ -317,7 +317,7 @@ function ConvertTo-UnitySetupComponent {
         [parameter(Mandatory = $false)]
         [UnityVersion] $Version
     )
-    
+
     if ($Version) {
         if ($Version.Major -ge 2019) {
             if ($Component -band [UnitySetupComponent]::UWP) {
@@ -392,18 +392,18 @@ function Find-UnitySetupInstaller {
     )
 
     $installerTemplates = @{
-        [UnitySetupComponent]::UWP            =   "$targetSupport/UnitySetup-UWP-.NET-Support-for-Editor-$Version.$installerExtension",
-                                                  "$targetSupport/UnitySetup-Metro-Support-for-Editor-$Version.$installerExtension",
-                                                  "$targetSupport/UnitySetup-Universal-Windows-Platform-Support-for-Editor-$Version.$installerExtension";
+        [UnitySetupComponent]::UWP            = "$targetSupport/UnitySetup-UWP-.NET-Support-for-Editor-$Version.$installerExtension",
+        "$targetSupport/UnitySetup-Metro-Support-for-Editor-$Version.$installerExtension",
+        "$targetSupport/UnitySetup-Universal-Windows-Platform-Support-for-Editor-$Version.$installerExtension";
         [UnitySetupComponent]::UWP_IL2CPP     = , "$targetSupport/UnitySetup-UWP-IL2CPP-Support-for-Editor-$Version.$installerExtension";
         [UnitySetupComponent]::Android        = , "$targetSupport/UnitySetup-Android-Support-for-Editor-$Version.$installerExtension";
         [UnitySetupComponent]::iOS            = , "$targetSupport/UnitySetup-iOS-Support-for-Editor-$Version.$installerExtension";
         [UnitySetupComponent]::AppleTV        = , "$targetSupport/UnitySetup-AppleTV-Support-for-Editor-$Version.$installerExtension";
         [UnitySetupComponent]::Facebook       = , "$targetSupport/UnitySetup-Facebook-Games-Support-for-Editor-$Version.$installerExtension";
-        [UnitySetupComponent]::Linux          =   "$targetSupport/UnitySetup-Linux-Support-for-Editor-$Version.$installerExtension",
-                                                  "$targetSupport/UnitySetup-Linux-Mono-Support-for-Editor-$Version.$installerExtension";
-        [UnitySetupComponent]::Mac            =   "$targetSupport/UnitySetup-Mac-Support-for-Editor-$Version.$installerExtension",
-                                                  "$targetSupport/UnitySetup-Mac-Mono-Support-for-Editor-$Version.$installerExtension";
+        [UnitySetupComponent]::Linux          = "$targetSupport/UnitySetup-Linux-Support-for-Editor-$Version.$installerExtension",
+        "$targetSupport/UnitySetup-Linux-Mono-Support-for-Editor-$Version.$installerExtension";
+        [UnitySetupComponent]::Mac            = "$targetSupport/UnitySetup-Mac-Support-for-Editor-$Version.$installerExtension",
+        "$targetSupport/UnitySetup-Mac-Mono-Support-for-Editor-$Version.$installerExtension";
         [UnitySetupComponent]::Mac_IL2CPP     = , "$targetSupport/UnitySetup-Mac-IL2CPP-Support-for-Editor-$Version.$installerExtension";
         [UnitySetupComponent]::Vuforia        = , "$targetSupport/UnitySetup-Vuforia-AR-Support-for-Editor-$Version.$installerExtension";
         [UnitySetupComponent]::WebGL          = , "$targetSupport/UnitySetup-WebGL-Support-for-Editor-$Version.$installerExtension";
@@ -461,7 +461,7 @@ function Find-UnitySetupInstaller {
         'f' {
             $searchPages += "https://unity3d.com/get-unity/download/archive",
             "https://unity3d.com/unity/whats-new/$($Version.Major).$($Version.Minor).$($Version.Revision)"
-            
+
             # Just in case it's a release candidate search the beta as well.
             if ($Version.Revision -eq '0') {
                 $searchPages += "https://unity3d.com/unity/beta/unity$Version",
@@ -474,30 +474,30 @@ function Find-UnitySetupInstaller {
             $searchPages += $patchPage
 
             $webResult = Invoke-WebRequest $patchPage -UseBasicParsing
-            $searchPages += $webResult.Links | 
-                Where-Object { $_.href -match "\/unity\/qa\/patch-releases\?version=$($Version.Major)\.$($Version.Minor)&page=(\d+)" -and $Matches[1] -gt 1 } | 
-                ForEach-Object { "https://unity3d.com$($_.href)" }
+            $searchPages += $webResult.Links |
+            Where-Object { $_.href -match "\/unity\/qa\/patch-releases\?version=$($Version.Major)\.$($Version.Minor)&page=(\d+)" -and $Matches[1] -gt 1 } |
+            ForEach-Object { "https://unity3d.com$($_.href)" }
         }
     }
 
     foreach ($page in $searchPages) {
         try {
             $webResult = Invoke-WebRequest $page -UseBasicParsing
-            $prototypeLink = $webResult.Links | 
-                Select-Object -ExpandProperty href -ErrorAction SilentlyContinue | 
-                Where-Object {
-                    $link = $_
+            $prototypeLink = $webResult.Links |
+            Select-Object -ExpandProperty href -ErrorAction SilentlyContinue |
+            Where-Object {
+                $link = $_
 
-                    foreach ( $installer in $installerTemplates.Keys ) {
-                        foreach ( $template in $installerTemplates[$installer] ) {
-                            if ( $link -like "*$template*" ) { return $true }
-                        }
+                foreach ( $installer in $installerTemplates.Keys ) {
+                    foreach ( $template in $installerTemplates[$installer] ) {
+                        if ( $link -like "*$template*" ) { return $true }
                     }
+                }
 
-                    return $false
+                return $false
 
-                } | 
-                Select-Object -First 1
+            } |
+            Select-Object -First 1
 
             if ($null -ne $prototypeLink) { break }
         }
@@ -691,7 +691,7 @@ function Format-BitsPerSecond {
 .Synopsis
    Download specified Unity installers.
 .DESCRIPTION
-   Downloads the given installers into the $Cache directory. 
+   Downloads the given installers into the $Cache directory.
 .PARAMETER Installers
    List of installers that needs to be downloaded.
 .PARAMETER Cache
@@ -1025,7 +1025,7 @@ function Install-UnitySetupInstance {
                 if (-not $installPath.EndsWith([io.path]::DirectorySeparatorChar)) {
                     $installPath += [io.path]::DirectorySeparatorChar
                 }
-                
+
                 # Make sure the folder .unitysetup exist before create sparsebundle
                 if (-not (Test-Path $Cache -PathType Container)) {
                     Write-Verbose "Creating directory $Cache."
@@ -1142,7 +1142,7 @@ function Uninstall-UnitySetupInstance {
     process {
         foreach ( $setupInstance in $Instances ) {
             $uninstaller = Get-ChildItem "$($setupInstance.Path)" -Filter 'Uninstall.exe' -Recurse |
-                Select-Object -First 1 -ExpandProperty FullName
+            Select-Object -First 1 -ExpandProperty FullName
 
             if ($null -eq $uninstaller) {
                 Write-Error "Could not find Uninstaller.exe under $($setupInstance.Path)"
@@ -1200,18 +1200,18 @@ function Get-UnitySetupInstance {
         }
     }
 
-    Get-ChildItem -Path $BasePath -Directory -ErrorAction Ignore | 
-        Where-Object { (Get-UnityEditor $_.FullName).Count -gt 0 } | 
-        ForEach-Object {
-            $path = $_.FullName
-            try {
-                Write-Verbose "Creating UnitySetupInstance for $path"
-                [UnitySetupInstance]::new($path)
-            }
-            catch {
-                Write-Warning "$_"
-            }
+    Get-ChildItem -Path $BasePath -Directory -ErrorAction Ignore |
+    Where-Object { (Get-UnityEditor $_.FullName).Count -gt 0 } |
+    ForEach-Object {
+        $path = $_.FullName
+        try {
+            Write-Verbose "Creating UnitySetupInstance for $path"
+            [UnitySetupInstance]::new($path)
         }
+        catch {
+            Write-Warning "$_"
+        }
+    }
 }
 
 <#
@@ -1255,7 +1255,7 @@ function Get-UnitySetupInstanceVersion {
 
     # No version found, start digging deeper
     if ( Test-Path "$path\Editor" -PathType Container ) {
-        
+
         # Search for the version using the ivy.xml definitions for legacy editor compatibility.
         Write-Verbose "Looking for ivy.xml files under $path\Editor\"
         $ivyFiles = Get-ChildItem -Path "$path\Editor\" -Filter 'ivy.xml' -Recurse -ErrorAction SilentlyContinue -Force -File
@@ -1287,9 +1287,9 @@ function Get-UnitySetupInstanceVersion {
         if ($null -eq $headerMatchInfo) {
             Write-Verbose "Looking for .h files with UNITY_VERSION defined under $path\Editor\ "
             $headerMatchInfo = do {
-                Get-ChildItem -Path "$path\Editor\*.h" -Recurse -ErrorAction Ignore -Force -File | 
-                    Select-String -Pattern "UNITY_VERSION\s`"(\d+\.\d+\.\d+[fpba]\d+)`"" |
-                    ForEach-Object { $_; break; } # Stop the pipeline after the first result
+                Get-ChildItem -Path "$path\Editor\*.h" -Recurse -ErrorAction Ignore -Force -File |
+                Select-String -Pattern "UNITY_VERSION\s`"(\d+\.\d+\.\d+[fpba]\d+)`"" |
+                ForEach-Object { $_; break; } # Stop the pipeline after the first result
             } while ($false);
         }
 
@@ -1402,19 +1402,19 @@ function Get-UnityProjectInstance {
     }
 
     Get-ChildItem @args |
-        ForEach-Object {
-            $path = [io.path]::Combine($_.FullName, "ProjectVersion.txt")
-            if ( Test-Path $path ) {
-                [UnityProjectInstance]::new((Join-Path $_.FullName "..\" | Convert-Path))
-            }
+    ForEach-Object {
+        $path = [io.path]::Combine($_.FullName, "ProjectVersion.txt")
+        if ( Test-Path $path ) {
+            [UnityProjectInstance]::new((Join-Path $_.FullName "..\" | Convert-Path))
         }
+    }
 }
 
 <#
 .Synopsis
    Tests the meta file integrity of the Unity Project Instance(s).
 .DESCRIPTION
-   Tests if every item under assets has an associated .meta file 
+   Tests if every item under assets has an associated .meta file
    and every .meta file an associated item
    and that none of the meta file guids collide.
 .PARAMETER Project
@@ -1935,6 +1935,259 @@ function Start-UnityEditor {
             if ($PassThru) { $process }
         }
     }
+}
+
+<#
+.Synopsis
+    Gets the Unity package manifest(s) for the specified project(s).
+#>
+function Get-UnityProjectPackageManifest {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [UnityProjectInstance[]] $Project
+    )
+
+    process {
+        foreach ($p in $Project) {
+            $manifestPath = Join-Path $p.Path 'Packages/manifest.json'
+            Import-UnityPackageManifest -Path $manifestPath
+        }
+    }
+}
+
+<#
+.Synopsis
+    Sets the Unity package manifest for the specified project(s).
+#>
+function Set-UnityProjectPackageManifest {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName)]
+        # What project(s) should we export to?
+        [UnityProjectInstance[]] $Project,
+
+        [ValidateNotNull()]
+        [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName)]
+        # What manifest should we export?
+        [PSCustomObject]$Manifest
+    )
+
+    process {
+        foreach ($p in $Project) {
+            $manifestPath = Join-Path $p.Path 'Packages/manifest.json'
+            if ($PSCmdlet.ShouldProcess($manifestPath, 'Export-UnityPackageManifest')) {
+                Export-UnityPackageManifest -Manifest $Manifest -Path $manifestPath
+            }
+        }
+    }
+}
+
+
+<#
+.Synopsis
+    Import a Unity package manifest.
+#> 
+function Import-UnityPackageManifest {
+    [CmdletBinding()]
+    param(
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ if (-not $_ -or (Test-Path $_ -PathType Leaf)) { return $true } throw "Path $Path must exist." })]
+        [Parameter(Position = 0, ValueFromPipeline = $true)]
+        # What package manifest should we import?
+        [string]$Path
+    )
+    Write-Verbose "Importing unity package manifest at $Path..."
+    Get-ChildItem $Path | Get-Content | ConvertFrom-Json
+}
+
+<#
+.Synopsis
+    Export a Unity package manifest.
+#>
+function Export-UnityPackageManifest {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [ValidateNotNull()]
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipelineByPropertyName)]
+        # What manifest should we export?
+        [PSCustomObject]$Manifest,
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, Position = 1, ValueFromPipelineByPropertyName)]
+        # Where should we export the manifest?
+        [string]$Path,
+
+        [Parameter(ValueFromPipelineByPropertyName)]
+        # We should not overwrite existing files
+        [switch]$NoClobber,
+
+        [Parameter(ValueFromPipelineByPropertyName)]
+        # Forces the command to run without asking for user confirmation.
+        # Clear the read-only attribute of the output file if necessary. Attempt to reset the read-only attribute upon completion.
+        [switch]$Force
+    )
+
+    $Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path);
+    if (Test-Path $Path -PathType Leaf) {
+        if ($NoClobber) { 
+            Write-Error "The file '$Path' already exists." 
+            return; 
+        }
+        if ($Force) {
+            $itemProps = Get-ItemProperty $Path
+            $wasReadOnly = $itemProps.IsReadOnly
+            $itemProps.IsReadOnly = $false
+        }
+    }
+
+    if ($PSCmdlet.ShouldProcess($Path)) {
+        try {
+            $Manifest | ConvertTo-Json -Depth 100 | Set-Content -Path $Path -Encoding utf8
+        }
+        catch {
+            Write-Error $_.Exception.Message
+        }
+    }
+
+    if ($wasReadOnly) {
+        $itemProps.IsReadOnly = $true
+    }
+}
+
+<#
+.Synopsis
+    Set the scopes of the manifest so that they're included in the specified registry
+.Description
+    Finds the registry by matching the url or adds a new one. Any scopes in the specified registry are removed
+    from existing registries. After that any registries without remaining scopes are removed.
+#>
+function Set-UnityPackageManifestScopes {
+    [CmdletBinding()]
+    param(
+        [ValidateNotNull()]
+        [Parameter(Position = 0, ValueFromPipeline = $true)]
+        # What manifest should we set the scopes for?
+        [PSCustomObject]$Manifest,
+        [ValidateNotNull()]
+        # What registry should we setup?
+        [PSCustomObject]$ScopedRegistry
+    )
+
+    Write-Verbose "Checking for scoped registry with url = $($ScopedRegistry.url)"
+    $existingRegistry = $Manifest.scopedRegistries | Where-Object { $_ -and ([uri]$_.url) -eq $ScopedRegistry.url }
+    if ($null -eq $existingRegistry) {
+
+        Write-Verbose "No registry found, adding $($ScopedRegistry.name)"
+
+        $existingRegistry = [PSCustomObject]@{
+            name   = $ScopedRegistry.name
+            url    = $ScopedRegistry.url
+            scopes = $ScopedRegistry.scopes
+        }
+
+        if ($null -eq $Manifest.scopedRegistries) {
+            Add-Member -InputObject $Manifest -NotePropertyName 'scopedRegistries' -NotePropertyValue @($existingRegistry)
+        }
+        else {
+
+            # Remove scopes in the target from other registries that might include them
+            foreach ($registry in $Manifest.scopedRegistries) {
+                $registry.scopes = $registry.scopes | Where-Object {
+                    if ($_ -notin $ScopedRegistry.scopes) { return $true }
+
+                    Write-Verbose "Removing scope '$_' from $($registry.name)"
+                    return $false
+                }
+            }
+
+            # Remove any scopeless registries we've effectively replaced
+            [PSCustomObject[]]$registries = ($Manifest.scopedRegistries | Where-Object {
+                    if ($_.scopes.Length -gt 0) { return $true; }
+                    Write-Verbose "Removing scopeless registry $($_.name)"
+                    return $false
+                })
+
+            $registries += $existingRegistry
+            $Manifest.scopedRegistries = $registries
+        }
+    }
+    else {
+        Write-Verbose "Found registry $($existingRegistry.name)"
+        $existingRegistry.scopes += $ScopedRegistry.scopes | Where-Object { $_ -notin $existingRegistry.scopes } | ForEach-Object {
+            Write-Verbose "Adding scope '$_' to registry"
+            return $_
+        }
+    }
+
+    $Manifest
+}
+
+<#
+.Synopsis
+    Sets the package versions of dependencies
+#>
+function Set-UnityPackageManifestDependencyVersion {
+    [CmdletBinding()]
+    param(
+        [ValidateNotNull()]
+        [Parameter(Position = 0, ValueFromPipeline = $true, Mandatory = $true)]
+        # What manifest should we update?
+        [PSCustomObject]$Manifest,
+
+        # What packages need to have versions updated?
+        [PSCustomObject[]]$Dependencies
+    )
+
+    Write-Verbose "Checking for dependency updates..."
+    foreach ($dep in $Dependencies) {
+        $Manifest.dependencies | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -eq $dep.Name } | ForEach-Object {
+            Write-Verbose "Changing dependency $($_.Name) from $($Manifest.dependencies.($_.Name)) to $($dep.Version)"
+            $Manifest.dependencies.($_.Name) = "$($dep.Version)"
+        }
+    }
+
+    $Manifest
+}
+
+<#
+.Synopsis
+    Updates any dependencies so that they point directly at an artifact path
+#>
+function Set-UnityPackageManifestDependencyArtifact {
+    [CmdletBinding()]
+    param(
+        [ValidateNotNull()]
+        [Parameter(Position = 0, ValueFromPipeline = $true, Mandatory = $true)]
+        # What manifest should we update?
+        [PSCustomObject]$Manifest,
+
+        # What packages need to have versions updated?
+        [PSCustomObject[]]$Dependencies,
+
+        # If specified, artifact paths will be relative to this manifest.
+        [ValidateNotNull()]
+        [System.IO.FileInfo]$ManifestPath
+    )
+
+    Write-Verbose "Checking for dependency updates..."
+    foreach ($dep in $Dependencies) {
+        $Manifest.dependencies | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -eq $dep.Name } | ForEach-Object {
+
+            [string]$artifactPath = $dep.Artifact.FullName
+            if ($null -ne $ManifestPath) {
+                $artifactPath = [System.IO.Path]::GetRelativePath($ManifestPath.DirectoryName, $artifactPath)
+            }
+
+            $artifactPath = "file:$artifactPath" -replace '\\', '/'
+
+            Write-Verbose "Changing dependency $($_.Name) from $($Manifest.dependencies.($_.Name)) to $artifactPath"
+            $Manifest.dependencies.($_.Name) = "$artifactPath"
+        }
+    }
+
+    $Manifest
 }
 
 # Open the specified Unity log file and write any errors found in the file to the error stream.

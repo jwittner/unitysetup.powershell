@@ -73,7 +73,6 @@
     # NestedModules = @()
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-
     FunctionsToExport = @(
         'Find-UnitySetupInstaller',
         'Select-UnitySetupInstaller',
@@ -88,7 +87,11 @@
         'Get-UnityEditor',
         'Start-UnityEditor',
         'ConvertTo-UnitySetupComponent',
-        'Get-UnityLicense'
+        'Get-UnityLicense',
+        'Get-UnityProjectPackageManifest',
+        'Set-UnityProjectPackageManifest',
+        'Import-UnityPackageManifest',
+        'Export-UnityPackageManifest'
     )
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
