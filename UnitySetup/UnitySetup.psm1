@@ -652,7 +652,7 @@ function Select-UnitySetupInstaller {
     }
 }
 
-filter Format-Bytes {
+filter ConvertTo-ByteString {
     return "{0:N2} {1}" -f $(
         if ($_ -lt 1kb) { $_, 'Bytes' }
         elseif ($_ -lt 1mb) { ($_ / 1kb), 'KB' }
@@ -663,7 +663,7 @@ filter Format-Bytes {
     )
 }
 
-function Format-BitsPerSecond {
+function ConvertTo-BitsPerSecondString {
     [CmdletBinding()]
     param(
         [parameter(Mandatory = $true)]
@@ -704,6 +704,7 @@ function Format-BitsPerSecond {
 #>
 function Request-UnitySetupInstaller {
     [CmdletBinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification = 'Uses global data for tracking all downloads.')]
     param(
         [parameter(ValueFromPipeline = $true)]
         [UnitySetupInstaller[]] $Installers,
@@ -847,10 +848,10 @@ function Request-UnitySetupInstaller {
                         $secondsRemaining = ($data.totalBytes - $data.receivedBytes) / $averageSpeed
                     }
 
-                    $downloadSpeed = Format-BitsPerSecond -Bytes $data.receivedBytes -Seconds $elapsedTime.TotalSeconds
+                    $downloadSpeed = ConvertTo-BitsPerSecondString -Bytes $data.receivedBytes -Seconds $elapsedTime.TotalSeconds
 
                     Write-Progress -Activity "Downloading $installerFileName | $downloadSpeed" `
-                        -Status "$($data.receivedBytes | Format-Bytes) of $($data.totalBytes | Format-Bytes)" `
+                        -Status "$($data.receivedBytes | ConvertTo-ByteString) of $($data.totalBytes | ConvertTo-ByteString)" `
                         -SecondsRemaining $secondsRemaining `
                         -PercentComplete $progress `
                         -Id $data.downloadIndex
@@ -1390,7 +1391,7 @@ function Get-UnityProjectInstance {
         [switch] $Recurse
     )
 
-    $args = @{
+    $gciArgs = @{
         'Path'        = $BasePath;
         'Filter'      = 'ProjectSettings';
         'ErrorAction' = 'Ignore';
@@ -1398,10 +1399,10 @@ function Get-UnityProjectInstance {
     }
 
     if ( $Recurse ) {
-        $args['Recurse'] = $true;
+        $gciArgs['Recurse'] = $true;
     }
 
-    Get-ChildItem @args |
+    Get-ChildItem @gciArgs |
     ForEach-Object {
         $path = [io.path]::Combine($_.FullName, "ProjectVersion.txt")
         if ( Test-Path $path ) {
@@ -1921,7 +1922,7 @@ function Start-UnityEditor {
                 if ( $LogFile -and (Test-Path $LogFile -Type Leaf) ) {
                     # Note that Unity sometimes returns a success ExitCode despite the presence of errors, but we want
                     # to make sure that we flag such errors.
-                    Write-UnityErrors $LogFile
+                    Write-UnityError $LogFile
 
                     Write-Verbose "Writing $LogFile to Information stream Tagged as 'Logs'"
                     Get-Content $LogFile | ForEach-Object { Write-Information -MessageData $_ -Tags 'Logs' }
@@ -1944,12 +1945,14 @@ function Start-UnityEditor {
 function Get-UnityProjectPackageManifest {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0)]
+        [Parameter(ValueFromPipeline = $true, Position = 0)]
         [ValidateNotNullOrEmpty()]
+        # What project(s) should we get the manifest for?
         [UnityProjectInstance[]] $Project
     )
 
     process {
+        if (-not $Project) { $Project = @("$PWD") }
         foreach ($p in $Project) {
             $manifestPath = Join-Path $p.Path 'Packages/manifest.json'
             Import-UnityPackageManifest -Path $manifestPath
@@ -1965,12 +1968,12 @@ function Set-UnityProjectPackageManifest {
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [ValidateNotNullOrEmpty()]
-        [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName)]
+        [Parameter(ValueFromPipeline = $true)]
         # What project(s) should we export to?
-        [UnityProjectInstance[]] $Project,
+        [UnityProjectInstance[]] $Project = @("$PWD"),
 
         [ValidateNotNull()]
-        [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName)]
+        [Parameter(Mandatory = $true)]
         # What manifest should we export?
         [PSCustomObject]$Manifest
     )
@@ -1994,13 +1997,16 @@ function Import-UnityPackageManifest {
     [CmdletBinding()]
     param(
         [ValidateNotNullOrEmpty()]
-        [ValidateScript({ if (-not $_ -or (Test-Path $_ -PathType Leaf)) { return $true } throw "Path $Path must exist." })]
+        [ValidateScript({ if (-not $_ -or (Test-Path $_ -PathType Leaf)) { return $true } throw "Path $_ must exist." })]
         [Parameter(Position = 0, ValueFromPipeline = $true)]
         # What package manifest should we import?
         [string]$Path
     )
-    Write-Verbose "Importing unity package manifest at $Path..."
-    Get-ChildItem $Path | Get-Content | ConvertFrom-Json
+
+    process {
+        Write-Verbose "Importing unity package manifest at $Path..."
+        Get-ChildItem $Path | Get-Content | ConvertFrom-Json
+    }
 }
 
 <#
@@ -2011,48 +2017,53 @@ function Export-UnityPackageManifest {
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [ValidateNotNull()]
-        [Parameter(Mandatory = $true, Position = 0, ValueFromPipelineByPropertyName)]
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
         # What manifest should we export?
         [PSCustomObject]$Manifest,
+
         [ValidateNotNullOrEmpty()]
-        [Parameter(Mandatory = $true, Position = 1, ValueFromPipelineByPropertyName)]
+        [Parameter(Mandatory = $true, Position = 1)]
         # Where should we export the manifest?
         [string]$Path,
 
-        [Parameter(ValueFromPipelineByPropertyName)]
+        [Parameter()]
         # We should not overwrite existing files
         [switch]$NoClobber,
 
-        [Parameter(ValueFromPipelineByPropertyName)]
+        [Parameter()]
         # Forces the command to run without asking for user confirmation.
         # Clear the read-only attribute of the output file if necessary. Attempt to reset the read-only attribute upon completion.
         [switch]$Force
     )
 
-    $Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path);
-    if (Test-Path $Path -PathType Leaf) {
-        if ($NoClobber) { 
-            Write-Error "The file '$Path' already exists." 
-            return; 
-        }
-        if ($Force) {
-            $itemProps = Get-ItemProperty $Path
-            $wasReadOnly = $itemProps.IsReadOnly
-            $itemProps.IsReadOnly = $false
-        }
-    }
+    process {
+        if ($Force) { $ConfirmPreference = 'None' }
 
-    if ($PSCmdlet.ShouldProcess($Path)) {
+        $Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path);
+        if (Test-Path $Path -PathType Leaf) {
+            if ($NoClobber) { 
+                Write-Error "The file '$Path' already exists." 
+                return; 
+            }
+            if ($Force) {
+                $itemProps = Get-ItemProperty $Path
+                $wasReadOnly = $itemProps.IsReadOnly
+                $itemProps.IsReadOnly = $false
+            }
+        }
+    
         try {
-            $Manifest | ConvertTo-Json -Depth 100 | Set-Content -Path $Path -Encoding utf8
+            if ($PSCmdlet.ShouldProcess($Path)) {
+                $Manifest | ConvertTo-Json -Depth 100 | Set-Content -Path $Path -Encoding utf8
+            }
         }
         catch {
             Write-Error $_.Exception.Message
         }
-    }
 
-    if ($wasReadOnly) {
-        $itemProps.IsReadOnly = $true
+        if ($wasReadOnly) {
+            $itemProps.IsReadOnly = $true
+        }
     }
 }
 
@@ -2063,65 +2074,100 @@ function Export-UnityPackageManifest {
     Finds the registry by matching the url or adds a new one. Any scopes in the specified registry are removed
     from existing registries. After that any registries without remaining scopes are removed.
 #>
-function Set-UnityPackageManifestScopes {
-    [CmdletBinding()]
+function Set-UnityPackageManifestScopedRegistry {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [ValidateNotNull()]
-        [Parameter(Position = 0, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
         # What manifest should we set the scopes for?
         [PSCustomObject]$Manifest,
-        [ValidateNotNull()]
-        # What registry should we setup?
-        [PSCustomObject]$ScopedRegistry
+        
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $false, ParameterSetName = "Components")]
+        # Name to set the registry to
+        [string]$Name,
+
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ParameterSetName = "Components")]
+        # Url of the registry to set scopes for. If an existing registry 
+        [uri]$Url,
+
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ParameterSetName = "Components")]
+        # What scopes should we set on the registry
+        [string[]]$Scopes,
+
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ParameterSetName = "Registry")]
+        # What registry should we set. @{ [string]Name; [uri]Url; [string[]]Scopes }
+        [PSCustomObject[]]$Registry
     )
+    process {
 
-    Write-Verbose "Checking for scoped registry with url = $($ScopedRegistry.url)"
-    $existingRegistry = $Manifest.scopedRegistries | Where-Object { $_ -and ([uri]$_.url) -eq $ScopedRegistry.url }
-    if ($null -eq $existingRegistry) {
-
-        Write-Verbose "No registry found, adding $($ScopedRegistry.name)"
-
-        $existingRegistry = [PSCustomObject]@{
-            name   = $ScopedRegistry.name
-            url    = $ScopedRegistry.url
-            scopes = $ScopedRegistry.scopes
-        }
-
-        if ($null -eq $Manifest.scopedRegistries) {
-            Add-Member -InputObject $Manifest -NotePropertyName 'scopedRegistries' -NotePropertyValue @($existingRegistry)
-        }
-        else {
-
-            # Remove scopes in the target from other registries that might include them
-            foreach ($registry in $Manifest.scopedRegistries) {
-                $registry.scopes = $registry.scopes | Where-Object {
-                    if ($_ -notin $ScopedRegistry.scopes) { return $true }
-
-                    Write-Verbose "Removing scope '$_' from $($registry.name)"
-                    return $false
-                }
+        if ($Registry.Length -gt 0) {
+            foreach ($reg in $Registry) {
+                Set-UnityPackageManifestScopedRegistry -Manifest $Manifest @reg > $null
             }
 
-            # Remove any scopeless registries we've effectively replaced
-            [PSCustomObject[]]$registries = ($Manifest.scopedRegistries | Where-Object {
-                    if ($_.scopes.Length -gt 0) { return $true; }
-                    Write-Verbose "Removing scopeless registry $($_.name)"
-                    return $false
-                })
-
-            $registries += $existingRegistry
-            $Manifest.scopedRegistries = $registries
+            return $Manifest;
         }
-    }
-    else {
-        Write-Verbose "Found registry $($existingRegistry.name)"
-        $existingRegistry.scopes += $ScopedRegistry.scopes | Where-Object { $_ -notin $existingRegistry.scopes } | ForEach-Object {
-            Write-Verbose "Adding scope '$_' to registry"
-            return $_
-        }
-    }
 
-    $Manifest
+        if (-not $Name) { $Name = $Url.Host }
+
+        Write-Verbose "Checking for scoped registry with url `"$Url`""
+        $existingRegistry = $Manifest.scopedRegistries | Where-Object { $_ -and ([uri]$_.url) -eq $Url }
+        if ($null -eq $existingRegistry) {
+
+            $newRegistry = [PSCustomObject]@{
+                name   = $Name
+                url    = $Url
+                scopes = $Scopes
+            }
+
+            if ($null -eq $Manifest.scopedRegistries) {
+                if ($PSCmdlet.ShouldProcess($Manifest, "Add scopedRegistries property with $Name $Url $Scopes")) {
+                    Add-Member -InputObject $Manifest -NotePropertyName 'scopedRegistries' -NotePropertyValue @($newRegistry)
+                }
+            }
+            else {
+
+                if ($PSCmdlet.ShouldProcess($Manifest, "Replace `"$Scopes`" in existing scopedRegistries and add $Name $Url $Scopes")) {
+
+                    # Remove scopes in the target from other registries that might include them
+                    foreach ($registry in $Manifest.scopedRegistries) {
+                        $registry.scopes = $registry.scopes | Where-Object {
+                            if ($_ -notin $newRegistry.scopes) { return $true }
+
+                            Write-Verbose "Removing scope '$_' from $($registry.name)"
+                            return $false
+                        }
+                    }
+
+                    # Remove any scopeless registries we've effectively replaced
+                    [PSCustomObject[]]$registries = ($Manifest.scopedRegistries | Where-Object {
+                            if ($_.scopes.Length -gt 0) { return $true; }
+                            Write-Verbose "Removing scopeless registry $($_.name)"
+                            return $false
+                        })
+
+                    $registries += $newRegistry
+                    $Manifest.scopedRegistries = $registries
+                }
+            }
+        }
+        else {
+            if ($PSCmdlet.ShouldProcess("$($existingRegistry.name)", "Update scopes on existing registry to include $Scopes")) {
+                Write-Verbose "Found registry $($existingRegistry.name)"
+                $existingRegistry.name = $Name
+                $existingRegistry.scopes += $Scopes | Where-Object { $_ -notin $existingRegistry.scopes } | ForEach-Object {
+                    Write-Verbose "Adding scope '$_' to registry"
+                    return $_
+                }
+            }
+        }
+
+        $Manifest
+    }
 }
 
 <#
@@ -2129,69 +2175,113 @@ function Set-UnityPackageManifestScopes {
     Sets the package versions of dependencies
 #>
 function Set-UnityPackageManifestDependencyVersion {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = "Components", SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification = 'It is used, just inside a script block, which isnt detected by the rule.')]
     param(
         [ValidateNotNull()]
-        [Parameter(Position = 0, ValueFromPipeline = $true, Mandatory = $true)]
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
         # What manifest should we update?
         [PSCustomObject]$Manifest,
 
-        # What packages need to have versions updated?
-        [PSCustomObject[]]$Dependencies
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ParameterSetName = "Components")]
+        # Name of the dependency to set to $Version
+        [string]$Name,
+
+        [ValidateNotNull()]
+        [ValidatePattern('(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?')]
+        [Parameter(Mandatory = $true, ParameterSetName = "Components")]
+        # Version to set for the dependency $Name
+        [string]$Version,
+
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ParameterSetName = "Dependency")]
+        # What dependencies need to have versions updated?
+        # {[string]Name; [string]Version}
+        [PSCustomObject[]]$Dependency
     )
 
-    Write-Verbose "Checking for dependency updates..."
-    foreach ($dep in $Dependencies) {
-        $Manifest.dependencies | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -eq $dep.Name } | ForEach-Object {
-            Write-Verbose "Changing dependency $($_.Name) from $($Manifest.dependencies.($_.Name)) to $($dep.Version)"
-            $Manifest.dependencies.($_.Name) = "$($dep.Version)"
-        }
-    }
+    process {
+        if ($Dependency.Length -gt 0) {
+            foreach ($dep in $Dependencies) {
+                Set-UnityPackageManifestDependencyVersion -Manifest $Manifest @dep > $null
+            }
 
-    $Manifest
+            return $Manifest
+        }
+
+        $Manifest.dependencies | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -eq $Name } | ForEach-Object {
+            if ($PSCmdlet.ShouldProcess($_.Name, "Changing dependency from $($Manifest.dependencies.($_.Name)) to $Version")) {
+                $Manifest.dependencies.($_.Name) = "$Version"
+            }
+        }
+
+        $Manifest
+    }
 }
 
 <#
 .Synopsis
     Updates any dependencies so that they point directly at an artifact path
 #>
-function Set-UnityPackageManifestDependencyArtifact {
-    [CmdletBinding()]
+function Set-UnityPackageManifestDependencyPath {
+    [CmdletBinding(DefaultParameterSetName = "Components", SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification = 'It is used, just inside a script block, which isnt detected by the rule.')]
     param(
         [ValidateNotNull()]
         [Parameter(Position = 0, ValueFromPipeline = $true, Mandatory = $true)]
         # What manifest should we update?
         [PSCustomObject]$Manifest,
 
-        # What packages need to have versions updated?
-        [PSCustomObject[]]$Dependencies,
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ParameterSetName = "Components")]
+        [string]$Name,
 
-        # If specified, artifact paths will be relative to this manifest.
-        [ValidateNotNull()]
-        [System.IO.FileInfo]$ManifestPath
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ParameterSetName = "Components")]
+        [string]$Path,
+
+        # What packages need to have versions updated?
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $true, ParameterSetName = "Dependency")]
+        [PSCustomObject[]]$Dependency,
+
+        # If specified, artifact paths will be relative to this.
+        [ValidateNotNullOrEmpty()]
+        [string]$RelativeTo
     )
 
-    Write-Verbose "Checking for dependency updates..."
-    foreach ($dep in $Dependencies) {
-        $Manifest.dependencies | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -eq $dep.Name } | ForEach-Object {
+    process {
+        if ($Dependency.Length -gt 0) {
 
-            [string]$artifactPath = $dep.Artifact.FullName
-            if ($null -ne $ManifestPath) {
-                $artifactPath = [System.IO.Path]::GetRelativePath($ManifestPath.DirectoryName, $artifactPath)
-            }
+            $commonArgs = @{ Manifest = $Manifest }
+            if ($RelativeTo) { $commonArgs['RelativeTo'] = $RelativeTo }
 
-            $artifactPath = "file:$artifactPath" -replace '\\', '/'
+            foreach ($dep in $Dependencies) {
+                Set-UnityPackageManifestDependencyPath @commonArgs @dep > $null
+            }    
 
-            Write-Verbose "Changing dependency $($_.Name) from $($Manifest.dependencies.($_.Name)) to $artifactPath"
-            $Manifest.dependencies.($_.Name) = "$artifactPath"
+            return $Manifest;
         }
-    }
 
-    $Manifest
+        [string]$artifactPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path);
+        if ($RelativeTo) { $artifactPath = [System.IO.Path]::GetRelativePath($RelativeTo, $artifactPath) }
+        $artifactPath = "file:$artifactPath" -replace '\\', '/'
+    
+        $Manifest.dependencies | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -eq $Name } | ForEach-Object {   
+        
+            if ($PSCmdlet.ShouldProcess("$($_.Name)", "Change dependency from $($Manifest.dependencies.($_.Name)) to $artifactPath")) {
+                $Manifest.dependencies.($_.Name) = "$artifactPath"
+            }
+            
+        }
+
+        $Manifest
+    }
 }
 
 # Open the specified Unity log file and write any errors found in the file to the error stream.
-function Write-UnityErrors {
+function Write-UnityError {
     param([string] $LogFileName)
     Write-Verbose "Checking $LogFileName for errors"
     $errors = Get-Content $LogFileName | Where-Object { Get-IsUnityError $_ }

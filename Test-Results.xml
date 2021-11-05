@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<test-results xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="nunit_schema_2.5.xsd" name="Pester" total="4" errors="0" failures="0" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="2021-11-04" time="16:38:32">
+  <environment clr-version="Unknown" user="jowitt" machine-name="DESKTOP-MQUTN1B" platform="Microsoft Windows 10 Enterprise|C:\WINDOWS|\Device\Harddisk0\Partition3" user-domain="REDMOND" cwd="C:\Users\jowitt\source\Microsoft\unitysetup.powershell" os-version="10.0.19043" nunit-version="2.5.8.0" />
+  <culture-info current-culture="en-US" current-uiculture="en-US" />
+  <test-suite type="TestFixture" name="Pester" executed="True" result="Success" success="True" time="0.4004" asserts="0" description="Pester">
+    <results>
+      <test-suite type="TestFixture" name="C:\Users\jowitt\source\Microsoft\unitysetup.powershell\Tests\Export-UnityPackageManifest.Tests.ps1" executed="True" result="Success" success="True" time="0.2404" asserts="0" description="C:\Users\jowitt\source\Microsoft\unitysetup.powershell\Tests\Export-UnityPackageManifest.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Export-UnityPackageManifest" executed="True" result="Success" success="True" time="0.0142" asserts="0" description="Export-UnityPackageManifest">
+            <results>
+              <test-suite type="TestFixture" name="Export-UnityPackageManifest.Input Validation" executed="True" result="Success" success="True" time="0.0105" asserts="0" description="Export-UnityPackageManifest.Input Validation">
+                <results>
+                  <test-case description="throws on null config" name="Export-UnityPackageManifest.Input Validation.throws on null config" time="0.0051" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="throws on null path" name="Export-UnityPackageManifest.Input Validation.throws on null path" time="0.0024" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="C:\Users\jowitt\source\Microsoft\unitysetup.powershell\Tests\Import-UnityPackageManifest.Tests.ps1" executed="True" result="Success" success="True" time="0.16" asserts="0" description="C:\Users\jowitt\source\Microsoft\unitysetup.powershell\Tests\Import-UnityPackageManifest.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Import-UnityPackageManifest" executed="True" result="Success" success="True" time="0.0373" asserts="0" description="Import-UnityPackageManifest">
+            <results>
+              <test-suite type="TestFixture" name="Import-UnityPackageManifest.Input Validation" executed="True" result="Success" success="True" time="0.0334" asserts="0" description="Import-UnityPackageManifest.Input Validation">
+                <results>
+                  <test-case description="throws on null path" name="Import-UnityPackageManifest.Input Validation.throws on null path" time="0.0124" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="throws on non-existing file" name="Import-UnityPackageManifest.Input Validation.throws on non-existing file" time="0.0157" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+    </results>
+  </test-suite>
+</test-results>
